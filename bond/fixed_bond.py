@@ -14,8 +14,7 @@ from bond import Bond
 class FixedRateBond(Bond):
     """This class will hold all the variables associated with a fixed rate bond"""
     
-    def __init__(self, mat_dt=dt.datetime.now()+dt.timedelta(days=365), first_pay_dt=None, freq=0.5, cpn=0, dcc="ACT/ACT", 
-                 par=100, issue_dt=dt.datetime.today()):
+    def __init__(self, mat_dt=dt.datetime.now()+dt.timedelta(days=365), first_pay_dt=None, freq=0.5, cpn=0, dcc="ACT/ACT", par=100, issue_dt=dt.datetime.today()):
         ''' Constructor
         Parameters
         ==========
@@ -72,8 +71,25 @@ class FixedRateBond(Bond):
         '''
         return cumPresentValue(trade_dt, yld, self._cash_flows, self._pay_freq, cont=False)
 
+    def getYield(self, px, trade_dt=dt.datetime.today()):
+        ''' Will calculate YTM from pv
+        Parameters
+        ==========
+        px : float
+            price of bond
+        trade_dt : date
+            trade date
+        
+        Return
+        ======
+        tuple
+            pair of pv and ytm
+        '''
+        return calcYieldToDate(px, self._par, self._mat_dt, self._cpn, freq=self._pay_freq, start_date=trade_dt)
+    
 
 if __name__ == '__main__':
     bond = FixedRateBond(mat_dt=dt.datetime(2024, 1, 1), freq=1, cpn=5, issue_dt=dt.datetime(2014, 1, 1))
     # bond = FixedRateBond(trade_dt=dt.datetime(2014, 2, 15), mat_dt=dt.datetime(2024, 2, 15), freq=0.5, cpn=5, ytm=4.8)
     print(bond.getPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
+    print(bond.getYield(100, trade_dt=dt.datetime(2014, 1, 1)))
