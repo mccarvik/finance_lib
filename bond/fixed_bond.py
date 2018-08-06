@@ -87,9 +87,35 @@ class FixedRateBond(Bond):
         '''
         return calcYieldToDate(px, self._par, self._mat_dt, self._cpn, freq=self._pay_freq, start_date=trade_dt)
     
+    def calcDurationModified(self, px, trade_dt=dt.datetime.today()):
+        # Units: for every 1% movement in interest rates, bond in price by 2.621%.
+        ytm = self.getYield(px, trade_dt)
+        dur = 0
+        for cf in self._cash_flows:
+            t = (cf[0] - trade_dt).days / 365
+            # get present valye of cash flow * how many years away it is
+            d_temp =  t * (calcPV(cf[1], (ytm * self._pay_freq), (t / self._pay_freq)))
+            # divide by Bond price
+            dur += (d_temp / px)
+        return dur
+    
+    def calcDurationMacauley(self, px, trade_dt=dt.datetime.today()):
+        # Weighted average # of yrs until the pv of the bond's cash flows equals amount paid for the bond
+        ytm = self.getYield(px, trade_dt)
+        dur = 0
+        for cf in self._cash_flows:
+            t = (cf[0] - trade_dt).days / 365
+            # get present valye of cash flow * how many years away it is
+            d_temp = t * (calcPVContinuous(cf[1], (ytm * self._pay_freq), (t / self._pay_freq)))
+            # divide by Bond price
+            dur += (d_temp / px)
+        return dur
+        
 
 if __name__ == '__main__':
     bond = FixedRateBond(mat_dt=dt.datetime(2024, 1, 1), freq=1, cpn=5, issue_dt=dt.datetime(2014, 1, 1))
     # bond = FixedRateBond(trade_dt=dt.datetime(2014, 2, 15), mat_dt=dt.datetime(2024, 2, 15), freq=0.5, cpn=5, ytm=4.8)
     print(bond.getPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
     print(bond.getYield(100, trade_dt=dt.datetime(2014, 1, 1)))
+    print(bond.calcDurationModified(100, trade_dt=dt.datetime(2014, 1, 1)))
+    print(bond.calcDurationMacauley(100, trade_dt=dt.datetime(2014, 1, 1)))
