@@ -14,6 +14,16 @@ FREQ_MAP = {
     'Quarterly' : 0.25
 }
 
+
+def createZeroCurve():
+    ''' will create zero curve by boot strapping the instruments '''
+    pass
+
+def createFwdCurve():
+    ''' will make a forward curve from a zero curve'''
+    pass
+
+
 def bootstrap(first_zero_rate, first_mat, bs_rate_mats):
     """ Will bootstrap the forward rates together to calculate the par rates. Using
     the previously calculated rate to discount for the next rate

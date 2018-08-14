@@ -8,8 +8,10 @@ import datetime as dt
 from utils.fi_funcs import *
 from dx.frame import get_year_deltas
 
-# What are diff between spot rates, par rates, forward rates, zero rates
-
+# http://www.financialexamhelp123.com/par-curve-spot-curve-and-forward-curve/
+# zero rate (aka spot rate) - rate for a given cash flow at a give point in time
+# fwd rate - rate from one period in time in the future to a second period of time in the future
+# par rate - rate at a given maturity matching the YTM of a coupon paying bond at that maturity
 
 class ZeroCurve(object):
     """
