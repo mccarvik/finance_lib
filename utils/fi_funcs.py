@@ -1,7 +1,7 @@
 import sys
 import matplotlib as mpl
 mpl.use('Agg')
-import datetime, sys, pdb
+import datetime, sys, pdb, math
 from math import sqrt, pi, log, e
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -118,6 +118,10 @@ def calcPVContinuous(cf, ir, period):
         discounted cash flow
     '''
     return cf * e**((-1) * ir * period)
+    
+
+def calcDiscountFactor(mat, ir):
+    return math.pow(1. + ir, -mat)
 
 
 def createCashFlows(start_date, freq, mat_date, cpn, par, par_cf=True):

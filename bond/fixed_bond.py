@@ -9,6 +9,7 @@ import datetime as dt
 from utils.fi_funcs import *
 from dx.frame import deterministic_short_rate, get_year_deltas
 from bond import Bond
+from curves.zero_curve import ZeroCurve
 
 
 class FixedRateBond(Bond):
@@ -117,23 +118,31 @@ class FixedRateBond(Bond):
         t = get_year_deltas([trade_dt, cf[0]])[-1]
         return ((self._pay_freq - t) / self._pay_freq) * cf[1]
     
-    def cleanPrice(self, yld, trade_dt):
+    def getCleanPrice(self, yld, trade_dt):
         return self.calcPVMidDate(yld, trade_dt) - self.calcAccruedInterest(trade_dt)
     
-    def dirtyPrice(self, yld, trade_dt):
-        return self.cleanPrice(yld, trade_dt) + self.calcAccruedInterest(trade_dt)
+    def getDirtyPrice(self, yld, trade_dt):
+        return self.getCleanPrice(yld, trade_dt) + self.calcAccruedInterest(trade_dt)
         
     def calcPVMidDate(self, yld, trade_dt):
         return cumPresentValue(trade_dt, yld, self._cash_flows, self._pay_freq, cont=False)
 
+    def getPriceFromZeroCurve(self, curve, trade_dt):
+        NPV = 0.
+        for cf in self._cash_flows:
+            NPV += curve.getDF(trade_dt, cf[0]) * cf[1]
+        return NPV
 
 
 if __name__ == '__main__':
     bond = FixedRateBond(mat_dt=dt.datetime(2024, 1, 1), freq=1, cpn=5, issue_dt=dt.datetime(2014, 1, 1))
     # bond = FixedRateBond(trade_dt=dt.datetime(2014, 2, 15), mat_dt=dt.datetime(2024, 2, 15), freq=0.5, cpn=5, ytm=4.8)
-    print(bond.getPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
-    print(bond.dirtyPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
+    # print(bond.getPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
+    # print(bond.getDirtyPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
     
-    print(bond.getYield(100, trade_dt=dt.datetime(2014, 1, 1)))
-    print(bond.calcDurationModified(100, trade_dt=dt.datetime(2014, 1, 1)))
-    print(bond.calcDurationMacauley(100, trade_dt=dt.datetime(2014, 1, 1)))
+    # print(bond.getYield(100, trade_dt=dt.datetime(2014, 1, 1)))
+    # print(bond.calcDurationModified(100, trade_dt=dt.datetime(2014, 1, 1)))
+    # print(bond.calcDurationMacauley(100, trade_dt=dt.datetime(2014, 1, 1)))
+    
+    curve = ZeroCurve([dt.datetime(2014,1,1), dt.datetime(2015,1,1), dt.datetime(2016,1,1), dt.datetime(2019,1,1), dt.datetime(2024,1,1)], [0, 0.01, 0.02, 0.025, 0.03])
+    print(bond.getPriceFromZeroCurve(curve, trade_dt=dt.datetime(2014, 1, 1)))
