@@ -55,6 +55,7 @@ class FixedRateBond(Bond):
     
     def getPrice(self, yld, trade_dt=dt.datetime.today(), cont=False):
         ''' calculates the price of the bond, given yield and trade date
+            Will be the dirty price of the bond
         Parameters
         ==========
         trade_dt : date
@@ -110,12 +111,29 @@ class FixedRateBond(Bond):
             # divide by Bond price
             dur += (d_temp / px)
         return dur
+    
+    def calcAccruedInterest(self, trade_dt):
+        cf = min([c for c in self._cash_flows if c[0] > trade_dt], key = lambda t: t[0])
+        t = get_year_deltas([trade_dt, cf[0]])[-1]
+        return ((self._pay_freq - t) / self._pay_freq) * cf[1]
+    
+    def cleanPrice(self, yld, trade_dt):
+        return self.calcPVMidDate(yld, trade_dt) - self.calcAccruedInterest(trade_dt)
+    
+    def dirtyPrice(self, yld, trade_dt):
+        return self.cleanPrice(yld, trade_dt) + self.calcAccruedInterest(trade_dt)
         
+    def calcPVMidDate(self, yld, trade_dt):
+        return cumPresentValue(trade_dt, yld, self._cash_flows, self._pay_freq, cont=False)
+
+
 
 if __name__ == '__main__':
     bond = FixedRateBond(mat_dt=dt.datetime(2024, 1, 1), freq=1, cpn=5, issue_dt=dt.datetime(2014, 1, 1))
     # bond = FixedRateBond(trade_dt=dt.datetime(2014, 2, 15), mat_dt=dt.datetime(2024, 2, 15), freq=0.5, cpn=5, ytm=4.8)
     print(bond.getPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
+    print(bond.dirtyPrice(0.05, trade_dt=dt.datetime(2014, 1, 1)))
+    
     print(bond.getYield(100, trade_dt=dt.datetime(2014, 1, 1)))
     print(bond.calcDurationModified(100, trade_dt=dt.datetime(2014, 1, 1)))
     print(bond.calcDurationMacauley(100, trade_dt=dt.datetime(2014, 1, 1)))
