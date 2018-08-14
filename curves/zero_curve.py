@@ -8,6 +8,9 @@ import datetime as dt
 from utils.fi_funcs import *
 from dx.frame import get_year_deltas
 
+# What are diff between spot rates, par rates, forward rates, zero rates
+
+
 class ZeroCurve(object):
     """
     ZeroCurve object - handles basic nominal discounting
