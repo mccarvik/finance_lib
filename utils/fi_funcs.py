@@ -1,4 +1,4 @@
-import sys
+import sys, pdb
 import matplotlib as mpl
 mpl.use('Agg')
 import datetime, sys, pdb, math
@@ -8,6 +8,8 @@ import pandas as pd
 import numpy as np
 from dateutil.relativedelta import relativedelta
 
+from curves.curves import ZeroCurve
+from dx.frame import get_year_deltas
 
 FREQ_MAP = {
     'Semi-Annual' : 0.5,
@@ -15,13 +17,38 @@ FREQ_MAP = {
 }
 
 
-def createZeroCurve():
-    ''' will create zero curve by boot strapping the instruments '''
-    pass
+def createZeroCurve(pc, trade_dt):
+    ''' will create zero curve by boot strapping the instruments passed
+        par curve passed in   
+    '''
+    insts = pc.insts
+    pxs = pc.pxs
+    zc = ZeroCurve([], [])
+    for i, px in zip(insts, pxs):
+        if i.isBullet():
+            zc.addRate(i._mat_dt, i.getYield(px, trade_dt))
+        else:
+            # discount the current cash_flows based on the current rates, get the next rate
+            discounted_pv = 0
+            if zc.mats:
+                for cf in [c for c in i._cash_flows if c[0] <= zc.mats[-1]]:
+                    discounted_pv += calcPV(cf[1], zc.getZeroRate(cf[0]), get_year_deltas([trade_dt, cf[0]])[-1])
+                # rem_cfs = [(get_year_deltas([trade_dt, c[0]])[-1], c[1]) for c in i._cash_flows if c[0] > zc.mats[-1]]
+                rem_cfs = [c for c in i._cash_flows if c[0] > zc.mats[-1]]
+            else:
+                rem_cfs = i._cash_flows 
+            
+            # Get the maturity cfs (cpn and principal) to be used for spot rate
+            mat_cfs = [(get_year_deltas([trade_dt, cf[0]])[-1], cf[1]) for cf in rem_cfs if cf[0] == i._mat_dt]
+            # rest we discount by interpolating on the par rate curve
+            rem_cfs = [cf for cf in rem_cfs if cf[0] != i._mat_dt]
+            for cf in rem_cfs:
+                discounted_pv += calcPV(cf[1], pc.getParRate(cf[0]), get_year_deltas([trade_dt, cf[0]])[-1])
 
-def createFwdCurve():
-    ''' will make a forward curve from a zero curve'''
-    pass
+            ytm_func = lambda y: \
+                sum([c/(1+y*i._freq)**(t/i._freq) for t,c in mat_cfs]) - px + discounted_pv
+            zc.addRate(i._mat_dt, newton_raphson(ytm_func, 0.01))
+    return zc
 
 
 def bootstrap(first_zero_rate, first_mat, bs_rate_mats):
@@ -155,16 +182,24 @@ def createCashFlows(start_date, freq, mat_date, cpn, par, par_cf=True):
         date, amount tuple pairs for each cash flow
     '''
     tenor = (mat_date - start_date).days / 365.25 # assumes 365.25 days in a year
-    num_cfs = (1 / freq) * tenor
+    if freq == 0:
+        num_cfs = 0
+    else:
+        num_cfs = (1 / freq) * tenor
     days_from_issue = [int((365 * freq)*(i+1)) for i in range(round(num_cfs))]
     dates = [start_date + datetime.timedelta(i) for i in days_from_issue]
     cfs = [(dates[i], cpn * par * freq) for i in range(len(dates))]
+    
+    # Need this for rounding errors where the cpn date is put after maturity
+    if cfs and cfs[-1][0] > mat_date:
+        cfs[-1] = (mat_date, cfs[-1][1])
+        
     if par_cf:
         cfs.append((mat_date, par))
     return cfs
 
 
-def calcYieldToDate(price, par, mat_date, cpn, freq=0.5, start_date=datetime.datetime.today(), guess=None):
+def calcYieldToDate(price, par, mat_date, cpn, freq=0.5, start_date=datetime.datetime.today(), guess=0.01):
     ''' Takes a price and a cpn rate and then uses a newton-raphson approximation to
         zero in on the interest rate (i.e. YTM) that resolves the equation of all the discounted
         cash flows within and reasonable range
@@ -201,9 +236,13 @@ def calcYieldToDate(price, par, mat_date, cpn, freq=0.5, start_date=datetime.dat
     cfs = [c for c in cfs if c[0] > start_date]
     cpn_dts = [((i[0] - start_date).days / 365, i[1]) for i in cfs]
     
-    ytm_func = lambda y: \
-        sum([c/(1+y*freq)**(t/freq) for t,c in cpn_dts]) - price
-        
+    # Need this for bullet bonds
+    if freq != 0:
+        ytm_func = lambda y: \
+            sum([c/(1+y*freq)**(t/freq) for t,c in cpn_dts]) - price
+    else:
+        ytm_func = lambda y: \
+            sum([c/(1+y)**(t) for t,c in cpn_dts]) - price
     return newton_raphson(ytm_func, guess)
 
 
@@ -221,8 +260,8 @@ def newton_raphson(func, guess, rng=0.00001):
             lastX = nextX
             nextX = lastX - newY / derivative(func, lastX, rng)  # update estimate using N-R
         return nextX
-    except:
-        import pdb; pdb.set_trace()
+    except Exception as e:
+        pdb.set_trace()
         print()
     
 
@@ -290,11 +329,11 @@ def VaR(symbol='AAPL', notl=None, conf=0.95, dist=None, _d1=None, _d2=None, volw
     print('Rolling Normalized VaR   : ', np.sum(courbe['nqBreakR']))
     
 
+
 if __name__ == "__main__":
     # print(bootstrap(0.048, 400, [(0.053, 91), (0.055, 98)]))
     # print(calcYieldToDate(95.0428, 100, 1.5, 5.75))
     # print(calcYieldToDate(100, 100, 2, 6))
     # xFound = newton_raphson(quadratic, 5, 0.01)    # call the solver
     # print("solution: x = ", xFound)
-    # VaR()
-    t_curve = [(datetime.date(2018,1,1), 0.021), (datetime.date(2019,1,1), 0.03635)]
+    VaR()
